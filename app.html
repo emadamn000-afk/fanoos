@@ -62,7 +62,9 @@ location.href='https://www.tiktok.com/v2/auth/authorize/?client_key='+encodeURIC
 $('logout').onclick=()=>{sessionStorage.removeItem('fp_tok');location.href=REDIRECT};
 async function exchange(code){const body=new URLSearchParams({client_key:LS.get('fp_ck'),client_secret:LS.get('fp_cs'),code,grant_type:'authorization_code',redirect_uri:REDIRECT});
 const r=await fetch(API+'/v2/oauth/token/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const j=await r.json();if(!j.access_token)throw new Error(j.error_description||j.error||'token error');return j.access_token}
-async function api(path,opt){const r=await fetch(API+path,Object.assign({headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json; charset=UTF-8'}},opt||{}));return r.json()}
+const RELAY='https://xkdkhekfltwoirndbhbk.supabase.co/functions/v1/fanoos-tiktok-proxy';
+async function api(path,opt){opt=opt||{};const viaRelay=(opt.method||'GET')==='POST';const h={Authorization:'Bearer '+tok,'Content-Type':'application/json; charset=UTF-8'};if(viaRelay)h['X-TT-Path']=path;
+const r=await fetch(viaRelay?RELAY:API+path,{method:opt.method||'GET',headers:h,body:viaRelay?(opt.body||'{}'):undefined});return r.json()}
 async function loadMe(){const u=await api('/v2/user/info/?fields=open_id,avatar_url,display_name',{method:'GET'});const me=u.data&&u.data.user;
 if(me){$('me').innerHTML='<img src="'+me.avatar_url+'" alt=""><div><b>'+me.display_name+'</b><div class="ok">Connected to TikTok</div></div>';$('login').classList.add('hide');$('logout').classList.remove('hide')}
 const c=await api('/v2/post/publish/creator_info/query/',{method:'POST'});creator=c.data;if(!creator){$('creator').innerHTML='<span class="err">Could not load creator info</span>';return}
@@ -78,7 +80,7 @@ const body=direct?{post_info:{title:$('caption').value,privacy_level:$('privacy'
 const init=await api(direct?'/v2/post/publish/video/init/':'/v2/post/publish/inbox/video/init/',{method:'POST',body:JSON.stringify(body)});
 if(!init.data||!init.data.upload_url){st('Init failed: '+((init.error&&init.error.message)||'unknown'),'err');log(JSON.stringify(init.error));return}
 const id=init.data.publish_id;log('publish_id: '+id);
-const up=await fetch(init.data.upload_url,{method:'PUT',headers:{'Content-Type':f.type||'video/mp4','Content-Range':'bytes 0-'+(f.size-1)+'/'+f.size},body:f});log('upload: HTTP '+up.status);
+const up=await fetch(RELAY,{method:'PUT',headers:{Authorization:'Bearer '+tok,'X-Upload-Url':init.data.upload_url,'Content-Type':f.type||'video/mp4','Content-Range':'bytes 0-'+(f.size-1)+'/'+f.size},body:f});log('upload: HTTP '+up.status);
 for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,4000));const s=await api('/v2/post/publish/status/fetch/',{method:'POST',body:JSON.stringify({publish_id:id})});const v=s.data&&s.data.status;log('status: '+v+(s.data&&s.data.fail_reason?' ('+s.data.fail_reason+')':''));
 if(v==='PUBLISH_COMPLETE'){st('Posted to TikTok ✓','ok');return}if(v==='SEND_TO_USER_INBOX'){st('Sent to your TikTok inbox ✓ Open TikTok to finish the post.','ok');return}if(v==='FAILED'){st('TikTok could not process the video','err');return}}
 st('Still processing on TikTok. Check the app shortly.')}
