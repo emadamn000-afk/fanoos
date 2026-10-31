@@ -58,7 +58,7 @@ $('ck').value=LS.get('fp_ck')?'••••••':'';$('cs').value=LS.get('fp_c
 $('saveset').onclick=()=>{if(!$('ck').value.startsWith('•'))LS.set('fp_ck',$('ck').value.trim());if(!$('cs').value.startsWith('•'))LS.set('fp_cs',$('cs').value.trim());$('saveset').textContent='Saved ✓';};
 $('login').onclick=()=>{const ck=LS.get('fp_ck');if(!ck){st('Add the app client key in Owner settings','err');return}
 const s=Math.random().toString(36).slice(2);sessionStorage.setItem('fp_state',s);
-location.href='https://www.tiktok.com/v2/auth/authorize/?client_key='+encodeURIComponent(ck)+'&scope=user.info.basic,video.upload,video.publish&response_type=code&redirect_uri='+encodeURIComponent(REDIRECT)+'&state='+s;};
+location.href='https://www.tiktok.com/v2/auth/authorize/?client_key='+encodeURIComponent(ck)+'&scope=user.info.basic,video.upload,video.publish&response_type=code&redirect_uri='+encodeURIComponent(REDIRECT)+'&state='+s+'&disable_auto_auth=1';};
 $('logout').onclick=()=>{sessionStorage.removeItem('fp_tok');location.href=REDIRECT};
 async function exchange(code){const body=new URLSearchParams({client_key:LS.get('fp_ck'),client_secret:LS.get('fp_cs'),code,grant_type:'authorization_code',redirect_uri:REDIRECT});
 const r=await fetch(API+'/v2/oauth/token/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const j=await r.json();if(!j.access_token)throw new Error(j.error_description||j.error||'token error');return j.access_token}
