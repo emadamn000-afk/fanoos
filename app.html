@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fanoos Publisher</title>
+<style>
+:root{--bg:#0f0d1a;--card:#1b1830;--line:#2e2a4a;--ink:#f3f1ff;--mute:#a9a3c9;--accent:#f5b84a;--tt:#fe2c55}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--line)}
+header img{width:40px;height:40px;border-radius:50%}header h1{font-size:20px;margin:0}header span{color:var(--mute);font-size:13px}
+main{max-width:760px;margin:24px auto;padding:0 16px;display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+.card h2{margin:0 0 12px;font-size:16px}.step{color:var(--accent);font-weight:700;margin-right:6px}
+button{font:inherit;border:0;border-radius:10px;padding:11px 18px;cursor:pointer;font-weight:600}
+.tt{background:var(--tt);color:#fff}.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+label{display:block;font-size:13px;color:var(--mute);margin:12px 0 6px}
+input[type=text],input[type=password],textarea,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#120f22;color:var(--ink);font:inherit}
+textarea{min-height:80px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.who{display:flex;align-items:center;gap:12px}.who img{width:48px;height:48px;border-radius:50%;background:#333}
+.ok{color:#5be3a1}.err{color:#ff7a8a}.mute{color:var(--mute);font-size:13px}
+.toggles label{display:flex;gap:8px;align-items:center;margin:6px 0;color:var(--ink)}
+pre{white-space:pre-wrap;background:#120f22;border-radius:10px;padding:10px;font-size:12px;color:var(--mute);margin:10px 0 0}
+details{margin-top:8px}.hide{display:none}
+</style></head><body>
+<header><div style="font-size:30px">🏮</div><div><h1>Fanoos Publisher</h1><span>Publishes our own short videos to our own TikTok accounts</span></div></header>
+<main>
+<section class="card" id="c1"><h2><span class="step">1</span>Connect a TikTok account</h2>
+<p class="mute">Sign in with TikTok to let Fanoos Publisher post videos to your account. Scopes: user.info.basic, video.upload, video.publish.</p>
+<div class="row"><button class="tt" id="login">Continue with TikTok</button><button class="ghost hide" id="logout">Disconnect</button></div>
+<div id="me" class="who" style="margin-top:14px"></div>
+<details><summary class="mute">Owner settings (stored only in this browser)</summary>
+<label>App client key</label><input type="password" id="ck" autocomplete="off">
+<label>App client secret</label><input type="password" id="cs" autocomplete="off">
+<div style="margin-top:10px"><button class="ghost" id="saveset">Save</button></div></details>
+</section>
+<section class="card" id="c2"><h2><span class="step">2</span>Choose a video and post settings</h2>
+<div id="creator" class="mute">Connect an account first.</div>
+<label>Video file (MP4)</label><input type="file" id="file" accept="video/mp4,video/quicktime">
+<div id="fileinfo" class="mute"></div>
+<label>Caption</label><textarea id="caption" maxlength="2200" placeholder="Write a caption"></textarea>
+<label>Who can view this video</label><select id="privacy"><option value="">Select privacy</option></select>
+<div class="toggles"><label><input type="checkbox" id="cmt"> Allow comments</label><label><input type="checkbox" id="duet"> Allow Duet</label><label><input type="checkbox" id="stitch"> Allow Stitch</label></div>
+<div class="toggles"><label><input type="checkbox" id="brand"> This video promotes a brand, product or service</label></div>
+<p class="mute" id="consent">By posting, you agree to TikTok's <a style="color:var(--accent)" href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank">Music Usage Confirmation</a>.</p>
+</section>
+<section class="card" id="c3"><h2><span class="step">3</span>Publish</h2>
+<div class="row"><button class="tt" id="post" disabled>Post to TikTok</button><button class="ghost" id="draft" disabled>Send to TikTok as draft</button></div>
+<p class="mute">"Post to TikTok" publishes directly (video.publish). "Send as draft" puts the video in your TikTok inbox to finish in the app (video.upload). It can take a few minutes for TikTok to process the video.</p>
+<div id="status"></div><pre id="log" class="hide"></pre>
+</section>
+</main>
+<script>
+const REDIRECT=location.origin+location.pathname;const API='https://open.tiktokapis.com';
+const $=id=>document.getElementById(id);const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
+let tok=null,creator=null;
+function log(m){const l=$('log');l.classList.remove('hide');l.textContent+=m+'\n'}
+function st(m,c){$('status').innerHTML='<p class="'+(c||'')+'">'+m+'</p>'}
+$('ck').value=LS.get('fp_ck')?'••••••':'';$('cs').value=LS.get('fp_cs')?'••••••':'';
+$('saveset').onclick=()=>{if(!$('ck').value.startsWith('•'))LS.set('fp_ck',$('ck').value.trim());if(!$('cs').value.startsWith('•'))LS.set('fp_cs',$('cs').value.trim());$('saveset').textContent='Saved ✓';};
+$('login').onclick=()=>{const ck=LS.get('fp_ck');if(!ck){st('Add the app client key in Owner settings','err');return}
+const s=Math.random().toString(36).slice(2);sessionStorage.setItem('fp_state',s);
+location.href='https://www.tiktok.com/v2/auth/authorize/?client_key='+encodeURIComponent(ck)+'&scope=user.info.basic,video.upload,video.publish&response_type=code&redirect_uri='+encodeURIComponent(REDIRECT)+'&state='+s;};
+$('logout').onclick=()=>{sessionStorage.removeItem('fp_tok');location.href=REDIRECT};
+async function exchange(code){const body=new URLSearchParams({client_key:LS.get('fp_ck'),client_secret:LS.get('fp_cs'),code,grant_type:'authorization_code',redirect_uri:REDIRECT});
+const r=await fetch(API+'/v2/oauth/token/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});const j=await r.json();if(!j.access_token)throw new Error(j.error_description||j.error||'token error');return j.access_token}
+async function api(path,opt){const r=await fetch(API+path,Object.assign({headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json; charset=UTF-8'}},opt||{}));return r.json()}
+async function loadMe(){const u=await api('/v2/user/info/?fields=open_id,avatar_url,display_name',{method:'GET'});const me=u.data&&u.data.user;
+if(me){$('me').innerHTML='<img src="'+me.avatar_url+'" alt=""><div><b>'+me.display_name+'</b><div class="ok">Connected to TikTok</div></div>';$('login').classList.add('hide');$('logout').classList.remove('hide')}
+const c=await api('/v2/post/publish/creator_info/query/',{method:'POST'});creator=c.data;if(!creator){$('creator').innerHTML='<span class="err">Could not load creator info</span>';return}
+$('creator').innerHTML='Posting as <b>@'+creator.creator_username+'</b> ('+creator.creator_nickname+') · max video length '+creator.max_video_post_duration_sec+'s';
+const p=$('privacy');(creator.privacy_level_options||[]).forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent={PUBLIC_TO_EVERYONE:'Everyone',MUTUAL_FOLLOW_FRIENDS:'Friends',FOLLOWER_OF_CREATOR:'Followers',SELF_ONLY:'Only me'}[o]||o;p.appendChild(e)});
+if(creator.comment_disabled)$('cmt').disabled=true;if(creator.duet_disabled)$('duet').disabled=true;if(creator.stitch_disabled)$('stitch').disabled=true;check()}
+function check(){const ok=tok&&$('file').files[0]&&$('privacy').value;$('post').disabled=!ok;$('draft').disabled=!(tok&&$('file').files[0])}
+['file','privacy'].forEach(i=>$(i).addEventListener('change',check));
+$('file').addEventListener('change',()=>{const f=$('file').files[0];$('fileinfo').textContent=f?f.name+' · '+(f.size/1048576).toFixed(1)+' MB':''});
+async function send(direct){const f=$('file').files[0];st('Uploading to TikTok…');
+const src={source:'FILE_UPLOAD',video_size:f.size,chunk_size:f.size,total_chunk_count:1};
+const body=direct?{post_info:{title:$('caption').value,privacy_level:$('privacy').value,disable_comment:!$('cmt').checked,disable_duet:!$('duet').checked,disable_stitch:!$('stitch').checked,brand_content_toggle:$('brand').checked},source_info:src}:{source_info:src};
+const init=await api(direct?'/v2/post/publish/video/init/':'/v2/post/publish/inbox/video/init/',{method:'POST',body:JSON.stringify(body)});
+if(!init.data||!init.data.upload_url){st('Init failed: '+((init.error&&init.error.message)||'unknown'),'err');log(JSON.stringify(init.error));return}
+const id=init.data.publish_id;log('publish_id: '+id);
+const up=await fetch(init.data.upload_url,{method:'PUT',headers:{'Content-Type':f.type||'video/mp4','Content-Range':'bytes 0-'+(f.size-1)+'/'+f.size},body:f});log('upload: HTTP '+up.status);
+for(let i=0;i<30;i++){await new Promise(r=>setTimeout(r,4000));const s=await api('/v2/post/publish/status/fetch/',{method:'POST',body:JSON.stringify({publish_id:id})});const v=s.data&&s.data.status;log('status: '+v+(s.data&&s.data.fail_reason?' ('+s.data.fail_reason+')':''));
+if(v==='PUBLISH_COMPLETE'){st('Posted to TikTok ✓','ok');return}if(v==='SEND_TO_USER_INBOX'){st('Sent to your TikTok inbox ✓ Open TikTok to finish the post.','ok');return}if(v==='FAILED'){st('TikTok could not process the video','err');return}}
+st('Still processing on TikTok. Check the app shortly.')}
+$('post').onclick=()=>send(true);$('draft').onclick=()=>send(false);
+(async()=>{const q=new URLSearchParams(location.search);tok=sessionStorage.getItem('fp_tok');
+if(q.get('code')){history.replaceState(null,'',REDIRECT);if(q.get('state')!==sessionStorage.getItem('fp_state')){st('Sign-in state mismatch','err');return}
+try{tok=await exchange(q.get('code'));sessionStorage.setItem('fp_tok',tok)}catch(e){st(e.message,'err');return}}
+if(q.get('error'))st('TikTok sign-in was cancelled','err');if(tok)loadMe().catch(e=>st(e.message,'err'))})();
+</script></body></html>
